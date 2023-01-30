@@ -28,6 +28,8 @@ pub struct Response {
     // Boxed to save space (11 words to 1 word), and it's not accessed
     // frequently internally.
     url: Box<Url>,
+    #[cfg(feature = "ranni")]
+    cost_ns:i64,
 }
 
 impl Response {
@@ -36,6 +38,8 @@ impl Response {
         url: Url,
         accepts: Accepts,
         timeout: Option<Pin<Box<Sleep>>>,
+        #[cfg(feature = "ranni")]
+        cost_ns:i64,
     ) -> Response {
         let (mut parts, body) = res.into_parts();
         let decoder = Decoder::detect(&mut parts.headers, Body::response(body, timeout), accepts);
@@ -44,7 +48,16 @@ impl Response {
         Response {
             res,
             url: Box::new(url),
+            #[cfg(feature = "ranni")]
+            cost_ns
         }
+    }
+
+    /// cost
+    #[cfg(feature = "ranni")]
+    #[inline]
+    pub fn cost(&self) -> i64 {
+        self.cost_ns
     }
 
     /// Get the `StatusCode` of this `Response`.
@@ -414,6 +427,8 @@ impl<T: Into<Body>> From<http::Response<T>> for Response {
         Response {
             res,
             url: Box::new(url),
+            #[cfg(feature = "ranni")]
+            cost_ns:0
         }
     }
 }

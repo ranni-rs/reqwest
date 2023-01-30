@@ -1577,6 +1577,8 @@ impl Client {
                 body: reusable,
 
                 urls: Vec::new(),
+                #[cfg(feature = "ranni")]
+                create_at: chrono::Local::now().timestamp_nanos(),
 
                 retry_count: 0,
 
@@ -1815,6 +1817,7 @@ enum PendingInner {
     Error(Option<crate::Error>),
 }
 
+#[cfg(not(feature = "ranni"))]
 pin_project! {
     struct PendingRequest {
         method: Method,
@@ -1827,6 +1830,28 @@ pin_project! {
         retry_count: usize,
 
         client: Arc<ClientRef>,
+
+        #[pin]
+        in_flight: ResponseFuture,
+        #[pin]
+        timeout: Option<Pin<Box<Sleep>>>,
+    }
+}
+
+#[cfg(feature = "ranni")]
+pin_project! {
+    struct PendingRequest {
+        method: Method,
+        url: Url,
+        headers: HeaderMap,
+        body: Option<Option<Bytes>>,
+
+        urls: Vec<Url>,
+
+        retry_count: usize,
+
+        client: Arc<ClientRef>,
+        create_at:i64,
 
         #[pin]
         in_flight: ResponseFuture,
@@ -2077,6 +2102,16 @@ impl Future for PendingRequest {
                 }
             }
 
+            #[cfg(feature = "ranni")]
+            let res = Response::new(
+                res,
+                self.url.clone(),
+                self.client.accepts,
+                self.timeout.take(),
+                chrono::Local::now().timestamp_nanos() - self.create_at,
+            );
+
+            #[cfg(not(feature = "ranni"))]
             let res = Response::new(
                 res,
                 self.url.clone(),
